@@ -119,7 +119,7 @@ def train_sac(num_episodes=100, batch_size=256, update_freq=1, model_save_freq=2
     
     # Initialize environment and agent
     print("\n[1] Initializing environment and agent...")
-    env = EnergyEnv(num_episodes)
+    env = EnergyEnv()
     agent = SACAgent(state_dim=9, action_dim=2)  # Based on your get_state()
     
     # Initialize logger
@@ -151,7 +151,7 @@ def train_sac(num_episodes=100, batch_size=256, update_freq=1, model_save_freq=2
     print("-" * 70)
     
     for episode in range(num_episodes):
-        state = env.reset(episode)
+        state = env.reset()
         episode_reward = 0
         episode_cost = 0
         episode_losses = {'q1': [], 'actor': [], 'alpha': []}

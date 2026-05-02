@@ -14,7 +14,7 @@ import yaml
 
 
 class EnergyEnv:
-    def __init__(self,episodes):
+    def __init__(self):
         with open(config_path,'r') as file:
             config = yaml.safe_load(file)
         self.dt = 0.25
@@ -24,13 +24,11 @@ class EnergyEnv:
         self.t_dep = 32  # EV departs at 8 AM (32*15min = 8 hours)
         #starting date and hour 01/03/2021 00:00
         self.idx = 0
-        self.episodes = np.random.permutation(episodes)
-        self.reset(0)
+        self.reset()
 
 
 
-    def reset(self,episode):
-            self.idx = int(self.episodes[episode])
+    def reset(self):
             return self.get_state()
 
     def get_state(self):
@@ -81,12 +79,12 @@ class EnergyEnv:
             return np.random.uniform(-1.0,1.0,2)
 
 if __name__ == "__main__":
-    env = EnergyEnv(100)
-    state = env.reset(0)
+    env = EnergyEnv()
+    state = env.reset()
     for _ in range(10):
         action = env.sample_random_action()
         next_state, reward, done, info = env.step(action)
         if done:
             print("Episode finished, resetting environment.")
-            state = env.reset(_)
+            state = env.reset()
  
