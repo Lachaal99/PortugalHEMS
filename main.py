@@ -251,7 +251,7 @@ if __name__ == "__main__":
     # - model_save_freq: Save model every N episodes
     
     train_sac(
-        num_episodes=100,
+        num_episodes=800,
         batch_size=256,
         update_freq=1,
         model_save_freq=500

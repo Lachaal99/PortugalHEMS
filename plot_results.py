@@ -30,22 +30,38 @@ def plot_training_results(run_dir):
     # Set style
     plt.style.use('seaborn-v0_8-darkgrid')
     
-    # ========== Figure 1: Episode Rewards and Costs ==========
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+    # ========== Figure 1: Individual Rewards and Costs ==========
+    # Aggregate rewards by episode
+    battery_reward_per_episode = steps_df.groupby('episode')['bat_reward'].sum().reset_index()
+    ev_reward_per_episode = steps_df.groupby('episode')['ev_reward'].sum().reset_index()
     
-    ax1.plot(episodes_df['episode'], episodes_df['total_reward'], linewidth=2, color='blue')
-    ax1.fill_between(episodes_df['episode'], episodes_df['total_reward'], alpha=0.3, color='blue')
-    ax1.set_xlabel('Episode')
-    ax1.set_ylabel('Total Reward')
-    ax1.set_title('Episode Reward Over Time')
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10))
+    
+    # Battery Reward
+    ax1.plot(battery_reward_per_episode['episode'], battery_reward_per_episode['bat_reward'], 
+             linewidth=2, color='green')
+    ax1.fill_between(battery_reward_per_episode['episode'], battery_reward_per_episode['bat_reward'], 
+                     alpha=0.3, color='green')
+    ax1.set_ylabel('Battery Reward')
+    ax1.set_title('Battery Reward Over Time')
     ax1.grid(True, alpha=0.3)
     
-    ax2.plot(episodes_df['episode'], episodes_df['total_cost'], linewidth=2, color='red')
-    ax2.fill_between(episodes_df['episode'], episodes_df['total_cost'], alpha=0.3, color='red')
-    ax2.set_xlabel('Episode')
-    ax2.set_ylabel('Total Cost (EUR)')
-    ax2.set_title('Daily Cost Over Time')
+    # EV Reward
+    ax2.plot(ev_reward_per_episode['episode'], ev_reward_per_episode['ev_reward'], 
+             linewidth=2, color='orange')
+    ax2.fill_between(ev_reward_per_episode['episode'], ev_reward_per_episode['ev_reward'], 
+                     alpha=0.3, color='orange')
+    ax2.set_ylabel('EV Reward')
+    ax2.set_title('EV Reward Over Time')
     ax2.grid(True, alpha=0.3)
+    
+    # Total Cost
+    ax3.plot(episodes_df['episode'], episodes_df['total_cost'], linewidth=2, color='red')
+    ax3.fill_between(episodes_df['episode'], episodes_df['total_cost'], alpha=0.3, color='red')
+    ax3.set_xlabel('Episode')
+    ax3.set_ylabel('Total Cost (EUR)')
+    ax3.set_title('Daily Cost Over Time')
+    ax3.grid(True, alpha=0.3)
     
     plt.tight_layout()
     plt.savefig(plots_dir / "01_rewards_costs.png", dpi=300, bbox_inches='tight')
