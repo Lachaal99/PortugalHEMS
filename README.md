@@ -48,8 +48,8 @@ This project implements a **Home Energy Management System (HEMS)** powered by **
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/home-energy-rl.git
-cd home-energy-rl
+git clone https://github.com/Lachaal99/PortugalHEMS.git
+cd PortugalHEMS
 
 # Create virtual environment
 python -m venv venv
@@ -68,8 +68,8 @@ pip install -r requirements-core.txt
 
 ```bash
 # Clone and setup
-git clone https://github.com/yourusername/home-energy-rl.git
-cd home-energy-rl
+git clone https://github.com/Lachaa99/PortugalHEMS.git
+cd PortugalHEMS
 
 # Create virtual environment
 python -m venv venv
