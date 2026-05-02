@@ -4,10 +4,6 @@ checkpoints/
 *.pt
 *.pth
 
-# Data
-data/raw/
-data/processed/
-
 # Python
 __pycache__/
 *.py[cod]
