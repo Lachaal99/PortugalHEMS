@@ -12,6 +12,7 @@ sys.path.insert(0, str(root))
 
 from hems_core.env.engine import EnergyEnv
 from hems_core.agents.sac.agent import SACAgent
+from hems_core.agents.dqn.agent import DQNAgent
 
 
 class TrainingLogger:
@@ -51,26 +52,27 @@ class TrainingLogger:
         }
         
         if loss_dict is not None:
-            step_record.update({
-                'q1_loss': float(loss_dict.get('q1_loss', 0)),
-                'actor_loss': float(loss_dict.get('actor_loss', 0)),
-                'alpha_loss': float(loss_dict.get('alpha_loss', 0)),
-            })
+            # Handle any loss metrics generically
+            for key, value in loss_dict.items():
+                step_record[key] = float(value)
         
         self.steps_data.append(step_record)
     
     def log_episode(self, episode, episode_reward, episode_cost, episode_length, 
-                    avg_q1_loss, avg_actor_loss, avg_alpha_loss):
+                    loss_dict=None):
         """Log episode summary."""
         episode_record = {
             'episode': episode,
             'total_reward': float(episode_reward),
             'total_cost': float(episode_cost),
             'length': episode_length,
-            'avg_q1_loss': float(avg_q1_loss),
-            'avg_actor_loss': float(avg_actor_loss),
-            'avg_alpha_loss': float(avg_alpha_loss),
         }
+        
+        if loss_dict is not None:
+            # Handle any loss metrics generically
+            for key, value in loss_dict.items():
+                episode_record[key] = float(value)
+        
         self.episodes_data.append(episode_record)
         
         # Print progress
@@ -204,8 +206,12 @@ def train_sac(num_episodes=100, batch_size=256, update_freq=1, model_save_freq=2
         avg_actor_loss = np.mean(episode_losses['actor']) if episode_losses['actor'] else 0
         avg_alpha_loss = np.mean(episode_losses['alpha']) if episode_losses['alpha'] else 0
         
-        logger.log_episode(episode, episode_reward, episode_cost, 96,
-                          avg_q1_loss, avg_actor_loss, avg_alpha_loss)
+        loss_dict = {
+            'avg_q1_loss': avg_q1_loss,
+            'avg_actor_loss': avg_actor_loss,
+            'avg_alpha_loss': avg_alpha_loss,
+        }
+        logger.log_episode(episode, episode_reward, episode_cost, 96, loss_dict=loss_dict)
         
         episode_rewards.append(episode_reward)
         episode_costs.append(episode_cost)
@@ -242,6 +248,139 @@ def train_sac(num_episodes=100, batch_size=256, update_freq=1, model_save_freq=2
     print("=" * 70)
 
 
+def train_dqn(num_episodes=500, update_freq=1, model_save_freq=50):
+    """
+    Train DQN agent on HEMS environment.
+    
+    Args:
+        num_episodes: Number of episodes to train
+        update_freq: Update frequency (every N steps)
+        model_save_freq: Save model every N episodes
+    """
+    from hems_core.agents.dqn.agent import decode_action
+    
+    print("=" * 70)
+    print("Starting DQN Training on HEMS Environment")
+    print("=" * 70)
+    
+    # Initialize environment and agent
+    print("\n[1] Initializing environment and agent...")
+    env = EnergyEnv()
+    agent = DQNAgent()
+    
+    # Initialize logger
+    logger = TrainingLogger(log_dir="logs")
+    
+    # Training configuration
+    config = {
+        'num_episodes': num_episodes,
+        'update_freq': update_freq,
+        'model_save_freq': model_save_freq,
+        'device': str(agent.device),
+        'gamma': agent.gamma,
+        'epsilon_start': agent.epsilon,
+    }
+    logger.save_config(config)
+    
+    # Training tracking
+    episode_rewards = []
+    episode_costs = []
+    
+    print(f"✓ Environment initialized (state_dim=9, action_dim=2 discretized)")
+    print(f"✓ Agent initialized on device: {agent.device}")
+    print(f"✓ Logs will be saved to: {logger.run_dir}")
+    
+    # Training loop
+    print("\n[2] Starting training loop...")
+    print("-" * 70)
+    
+    for episode in range(num_episodes):
+        state = env.reset()
+        episode_reward = 0
+        episode_cost = 0
+        episode_losses = []
+        
+        # Episode loop (96 steps per day)
+        for step in range(96):
+            # Select action (discrete index)
+            action_idx = agent.select_action(state, explore=True)
+            # Convert to continuous action
+            action_continuous = decode_action(action_idx)
+            
+            # Take step in environment
+            next_state, reward, done, info = env.step(action_continuous)
+            
+            # Store transition in replay buffer
+            agent.store(state, action_idx, reward, next_state, done)
+            
+            # Update agent
+            if step % update_freq == 0:
+                loss = agent.train_step()
+                if loss is not None:
+                    episode_losses.append(loss)
+            
+            # Accumulate metrics
+            episode_reward += reward
+            episode_cost += info['cost']
+            
+            # Log step data
+            loss_dict = None
+            if episode_losses:
+                loss_dict = {
+                    'dqn_loss': episode_losses[-1],
+                    'epsilon': agent.epsilon,
+                }
+            
+            logger.log_step(episode, step, state, action_continuous, reward, info, loss_dict=loss_dict)
+            
+            # Move to next state
+            state = next_state
+        
+        # Episode summary
+        avg_loss = np.mean(episode_losses) if episode_losses else 0
+        
+        loss_dict = {
+            'avg_dqn_loss': avg_loss,
+            'epsilon': agent.epsilon,
+        }
+        logger.log_episode(episode, episode_reward, episode_cost, 96, loss_dict=loss_dict)
+        
+        episode_rewards.append(episode_reward)
+        episode_costs.append(episode_cost)
+        
+        # Save model periodically
+        if (episode + 1) % model_save_freq == 0:
+            model_path = logger.run_dir / f"dqn_agent_ep{episode+1}.pt"
+            agent.save(str(model_path))
+            print(f"  → Model saved: {model_path}")
+    
+    print("-" * 70)
+    print(f"\n[3] Training completed!")
+    
+    # Save final model
+    final_model_path = logger.run_dir / "dqn_agent_final.pt"
+    agent.save(str(final_model_path))
+    print(f"✓ Final model saved: {final_model_path}")
+    
+    # Save training data
+    print(f"\n[4] Saving training data...")
+    logger.save_training_data()
+    
+    # Print summary statistics
+    print(f"\n[5] Training Summary:")
+    print(f"  - Total Episodes: {num_episodes}")
+    print(f"  - Avg Episode Reward: {np.mean(episode_rewards):.2f}")
+    print(f"  - Best Episode Reward: {np.max(episode_rewards):.2f}")
+    print(f"  - Worst Episode Reward: {np.min(episode_rewards):.2f}")
+    print(f"  - Avg Daily Cost: {np.mean(episode_costs):.4f} EUR")
+    print(f"  - Total Cost: {np.sum(episode_costs):.4f} EUR")
+    print(f"  - Final Epsilon: {agent.epsilon:.4f}")
+    
+    print("\n" + "=" * 70)
+    print("Training session complete!")
+    print("=" * 70)
+
+
 if __name__ == "__main__":
     # Train for 100 episodes
     # Adjust hyperparameters as needed:
@@ -250,9 +389,17 @@ if __name__ == "__main__":
     # - update_freq: How often to update (every N steps)
     # - model_save_freq: Save model every N episodes
     
-    train_sac(
-        num_episodes=800,
-        batch_size=256,
-        update_freq=1,
-        model_save_freq=500
+    # Uncomment the agent you want to train:
+    
+    # Train SAC agent
+    # train_sac(
+    #     num_episodes=800,
+    #     batch_size=256,
+    #     update_freq=1,
+    #     model_save_freq=500
+    # )
+    
+    # Train DQN agent
+    train_dqn(
+        num_episodes=700,
     )

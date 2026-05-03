@@ -23,6 +23,13 @@ def plot_training_results(run_dir):
     episodes_df = pd.read_csv(run_path / "training_episodes.csv")
     steps_df = pd.read_csv(run_path / "training_steps.csv")
     
+    # Detect agent type based on available columns
+    has_actor_loss = 'avg_actor_loss' in episodes_df.columns
+    has_dqn_loss = 'avg_dqn_loss' in episodes_df.columns
+    agent_type = 'SAC' if has_actor_loss else 'DQN' if has_dqn_loss else 'Unknown'
+    
+    print(f"Detected agent type: {agent_type}")
+    
     # Create output directory for plots
     plots_dir = run_path / "plots"
     plots_dir.mkdir(exist_ok=True)
@@ -69,33 +76,60 @@ def plot_training_results(run_dir):
     plt.close()
     
     # ========== Figure 2: Training Losses ==========
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4))
-    
-    ax = axes[0]
-    ax.plot(episodes_df['episode'], episodes_df['avg_q1_loss'], linewidth=2, color='green')
-    ax.set_xlabel('Episode')
-    ax.set_ylabel('Q1 Loss')
-    ax.set_title('Critic Q1 Loss')
-    ax.grid(True, alpha=0.3)
-    
-    ax = axes[1]
-    ax.plot(episodes_df['episode'], episodes_df['avg_actor_loss'], linewidth=2, color='orange')
-    ax.set_xlabel('Episode')
-    ax.set_ylabel('Actor Loss')
-    ax.set_title('Actor Loss')
-    ax.grid(True, alpha=0.3)
-    
-    ax = axes[2]
-    ax.plot(episodes_df['episode'], episodes_df['avg_alpha_loss'], linewidth=2, color='purple')
-    ax.set_xlabel('Episode')
-    ax.set_ylabel('Alpha Loss')
-    ax.set_title('Entropy Loss')
-    ax.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    plt.savefig(plots_dir / "02_losses.png", dpi=300, bbox_inches='tight')
-    print(f"✓ Saved: {plots_dir / '02_losses.png'}")
-    plt.close()
+    if agent_type == 'SAC':
+        # SAC: Plot Q1 Loss, Actor Loss, Alpha Loss
+        fig, axes = plt.subplots(1, 3, figsize=(14, 4))
+        
+        ax = axes[0]
+        ax.plot(episodes_df['episode'], episodes_df['avg_q1_loss'], linewidth=2, color='green')
+        ax.set_xlabel('Episode')
+        ax.set_ylabel('Q1 Loss')
+        ax.set_title('Critic Q1 Loss')
+        ax.grid(True, alpha=0.3)
+        
+        ax = axes[1]
+        ax.plot(episodes_df['episode'], episodes_df['avg_actor_loss'], linewidth=2, color='orange')
+        ax.set_xlabel('Episode')
+        ax.set_ylabel('Actor Loss')
+        ax.set_title('Actor Loss')
+        ax.grid(True, alpha=0.3)
+        
+        ax = axes[2]
+        ax.plot(episodes_df['episode'], episodes_df['avg_alpha_loss'], linewidth=2, color='purple')
+        ax.set_xlabel('Episode')
+        ax.set_ylabel('Alpha Loss')
+        ax.set_title('Entropy Loss')
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(plots_dir / "02_losses.png", dpi=300, bbox_inches='tight')
+        print(f"✓ Saved: {plots_dir / '02_losses.png'}")
+        plt.close()
+        
+    elif agent_type == 'DQN':
+        # DQN: Plot DQN Loss and Epsilon Decay
+        fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+        
+        ax = axes[0]
+        ax.plot(episodes_df['episode'], episodes_df['avg_dqn_loss'], linewidth=2, color='blue')
+        ax.fill_between(episodes_df['episode'], episodes_df['avg_dqn_loss'], alpha=0.3, color='blue')
+        ax.set_xlabel('Episode')
+        ax.set_ylabel('DQN Loss')
+        ax.set_title('DQN Loss Over Training')
+        ax.grid(True, alpha=0.3)
+        
+        ax = axes[1]
+        ax.plot(episodes_df['episode'], episodes_df['epsilon'], linewidth=2, color='red')
+        ax.fill_between(episodes_df['episode'], episodes_df['epsilon'], alpha=0.3, color='red')
+        ax.set_xlabel('Episode')
+        ax.set_ylabel('Epsilon (Exploration Rate)')
+        ax.set_title('Epsilon Decay Over Training')
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(plots_dir / "02_losses.png", dpi=300, bbox_inches='tight')
+        print(f"✓ Saved: {plots_dir / '02_losses.png'}")
+        plt.close()
     
     # ========== Figure 3: Step-by-step Actions & States (Last Episode) ==========
     last_episode = sorted(steps_df['episode'].unique())[-1]
