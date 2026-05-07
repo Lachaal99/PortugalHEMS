@@ -1,3 +1,7 @@
+/analysis/
+/_archive/
+notebooks/
+inferenc.py
 # Logs and Checkpoints
 logs/
 checkpoints/

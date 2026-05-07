@@ -113,7 +113,7 @@ def pv_profile(idx : int ) -> float:
     try:
         pv_data = load_pv_data()
         # PV data is in Watts, average across all 15-min intervals in that hour
-        return _get_Pv_value(pv_data, idx)
+        return _get_Pv_value(pv_data, idx)*0.001
     except Exception as e:
         logger.error(f"Error loading PV profile for index {idx}: {e}")
         return 0.0

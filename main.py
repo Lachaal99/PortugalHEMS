@@ -13,6 +13,7 @@ sys.path.insert(0, str(root))
 from hems_core.env.engine import EnergyEnv
 from hems_core.agents.sac.agent import SACAgent
 from hems_core.agents.dqn.agent import DQNAgent
+from hems_core.agents.ppo.agent import PPOAgent
 
 
 class TrainingLogger:
@@ -381,6 +382,172 @@ def train_dqn(num_episodes=500, update_freq=1, model_save_freq=50):
     print("=" * 70)
 
 
+def train_ppo(num_episodes=200, model_save_freq=20):
+    """
+    Train PPO agent on HEMS environment.
+    
+    Args:
+        num_episodes: Number of episodes to train (each episode = 96 steps = 1 day)
+        model_save_freq: Save model every N episodes
+    """
+    from hems_core.agents.ppo.config import ROLLOUT_STEPS, N_EPOCHS, MINI_BATCH_SIZE
+    
+    print("=" * 70)
+    print("Starting PPO Training on HEMS Environment")
+    print("=" * 70)
+    
+    # Initialize environment and agent
+    print("\n[1] Initializing environment and agent...")
+    env = EnergyEnv()
+    agent = PPOAgent()
+    
+    # Initialize logger
+    logger = TrainingLogger(log_dir="logs")
+    
+    # Training configuration
+    config = {
+        'num_episodes': num_episodes,
+        'rollout_steps': ROLLOUT_STEPS,
+        'n_epochs': N_EPOCHS,
+        'mini_batch_size': MINI_BATCH_SIZE,
+        'device': str(agent.device),
+        'gamma': 0.99,
+        'actor_lr': 3e-4,
+        'critic_lr': 1e-3,
+    }
+    logger.save_config(config)
+    
+    # Training tracking
+    episode_rewards = []
+    episode_costs = []
+    
+    print(f"✓ Environment initialized (state_dim=9, action_dim=2)")
+    print(f"✓ Agent initialized on device: {agent.device}")
+    print(f"✓ Rollout steps per update: {ROLLOUT_STEPS} (4 full days)")
+    print(f"✓ Logs will be saved to: {logger.run_dir}")
+    
+    # Training loop
+    print("\n[2] Starting training loop...")
+    print("-" * 70)
+    
+    state = env.reset()
+    total_steps = 0
+    update_count = 0
+    
+    for episode in range(num_episodes):
+        episode_reward = 0
+        episode_cost = 0
+        episode_update_metrics = []
+        rollout_step_count = 0
+        
+        # Episode loop (96 steps per day)
+        for step in range(96):
+            # Select action (PPO returns action, log_prob, value)
+            action, log_prob, value = agent.select_action(state, deterministic=False)
+            
+            # Ensure action is numpy array
+            if isinstance(action, torch.Tensor):
+                action = action.cpu().numpy()
+            
+            # Take step in environment
+            next_state, reward, done, info = env.step(action)
+            
+            # Store transition in rollout buffer
+            agent.store(state, action, reward, done, value, log_prob)
+            rollout_step_count += 1
+            total_steps += 1
+            
+            # Accumulate metrics
+            episode_reward += reward
+            episode_cost += info['cost']
+            
+            # Log step data
+            loss_dict = None
+            if episode_update_metrics:
+                # Use the last update metrics for logging
+                loss_dict = {
+                    'policy_loss': episode_update_metrics[-1]['policy_loss'],
+                    'value_loss': episode_update_metrics[-1]['value_loss'],
+                    'entropy': episode_update_metrics[-1]['entropy'],
+                    'clip_frac': episode_update_metrics[-1]['clip_frac'],
+                }
+            
+            logger.log_step(episode, step, state, action, reward, info, loss_dict=loss_dict)
+            
+            # Move to next state
+            state = next_state
+            
+            # PPO update: after ROLLOUT_STEPS or at episode end
+            do_update = (total_steps % ROLLOUT_STEPS == 0) or (episode == num_episodes - 1 and step == 95)
+            
+            if do_update:
+                # Get value of next state for bootstrapping (or 0 if done)
+                if not done:
+                    _, _, last_value = agent.select_action(next_state, deterministic=True)
+                else:
+                    last_value = 0.0
+                
+                # Run PPO update
+                update_metrics = agent.update(last_value=last_value, last_done=done)
+                episode_update_metrics.append(update_metrics)
+                update_count += 1
+                
+                # Anneal learning rate
+                progress = total_steps / (num_episodes * 96)
+                agent.anneal_lr(progress)
+        
+        # Episode summary
+        avg_policy_loss = np.mean([m['policy_loss'] for m in episode_update_metrics]) if episode_update_metrics else 0
+        avg_value_loss = np.mean([m['value_loss'] for m in episode_update_metrics]) if episode_update_metrics else 0
+        avg_entropy = np.mean([m['entropy'] for m in episode_update_metrics]) if episode_update_metrics else 0
+        avg_clip_frac = np.mean([m['clip_frac'] for m in episode_update_metrics]) if episode_update_metrics else 0
+        
+        loss_dict = {
+            'avg_policy_loss': avg_policy_loss,
+            'avg_value_loss': avg_value_loss,
+            'avg_entropy': avg_entropy,
+            'avg_clip_frac': avg_clip_frac,
+            'update_count': update_count,
+        }
+        logger.log_episode(episode, episode_reward, episode_cost, 96, loss_dict=loss_dict)
+        
+        episode_rewards.append(episode_reward)
+        episode_costs.append(episode_cost)
+        
+        # Save model periodically
+        if (episode + 1) % model_save_freq == 0:
+            model_path = logger.run_dir / f"ppo_agent_ep{episode+1}.pt"
+            agent.save(str(model_path))
+            print(f"  → Model saved: {model_path}")
+    
+    print("-" * 70)
+    print(f"\n[3] Training completed!")
+    
+    # Save final model
+    final_model_path = logger.run_dir / "ppo_agent_final.pt"
+    agent.save(str(final_model_path))
+    print(f"✓ Final model saved: {final_model_path}")
+    
+    # Save training data
+    print(f"\n[4] Saving training data...")
+    logger.save_training_data()
+    
+    # Print summary statistics
+    print(f"\n[5] Training Summary:")
+    print(f"  - Total Episodes: {num_episodes}")
+    print(f"  - Total Updates: {update_count}")
+    print(f"  - Total Steps: {total_steps}")
+    print(f"  - Avg Episode Reward: {np.mean(episode_rewards):.2f}")
+    print(f"  - Best Episode Reward: {np.max(episode_rewards):.2f}")
+    print(f"  - Worst Episode Reward: {np.min(episode_rewards):.2f}")
+    print(f"  - Avg Daily Cost: {np.mean(episode_costs):.4f} EUR")
+    print(f"  - Total Cost: {np.sum(episode_costs):.4f} EUR")
+    
+    print("\n" + "=" * 70)
+    print("Training session complete!")
+    print("=" * 70)
+
+
 if __name__ == "__main__":
     # Train for 100 episodes
     # Adjust hyperparameters as needed:
@@ -400,6 +567,12 @@ if __name__ == "__main__":
     # )
     
     # Train DQN agent
-    train_dqn(
-        num_episodes=700,
+    # train_dqn(
+    #     num_episodes=700,
+    # )
+    
+    # Train PPO agent
+    train_ppo(
+        num_episodes=800,
+        model_save_freq=100,
     )

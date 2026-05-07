@@ -26,7 +26,16 @@ def plot_training_results(run_dir):
     # Detect agent type based on available columns
     has_actor_loss = 'avg_actor_loss' in episodes_df.columns
     has_dqn_loss = 'avg_dqn_loss' in episodes_df.columns
-    agent_type = 'SAC' if has_actor_loss else 'DQN' if has_dqn_loss else 'Unknown'
+    has_policy_loss = 'avg_policy_loss' in episodes_df.columns
+    
+    if has_policy_loss:
+        agent_type = 'PPO'
+    elif has_actor_loss:
+        agent_type = 'SAC'
+    elif has_dqn_loss:
+        agent_type = 'DQN'
+    else:
+        agent_type = 'Unknown'
     
     print(f"Detected agent type: {agent_type}")
     
@@ -124,6 +133,47 @@ def plot_training_results(run_dir):
         ax.set_xlabel('Episode')
         ax.set_ylabel('Epsilon (Exploration Rate)')
         ax.set_title('Epsilon Decay Over Training')
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(plots_dir / "02_losses.png", dpi=300, bbox_inches='tight')
+        print(f"✓ Saved: {plots_dir / '02_losses.png'}")
+        plt.close()
+    
+    elif agent_type == 'PPO':
+        # PPO: Plot Policy Loss, Value Loss, Entropy, and Clip Fraction
+        fig, axes = plt.subplots(2, 2, figsize=(14, 8))
+        
+        ax = axes[0, 0]
+        ax.plot(episodes_df['episode'], episodes_df['avg_policy_loss'], linewidth=2, color='blue')
+        ax.fill_between(episodes_df['episode'], episodes_df['avg_policy_loss'], alpha=0.3, color='blue')
+        ax.set_xlabel('Episode')
+        ax.set_ylabel('Policy Loss')
+        ax.set_title('Policy Loss Over Training')
+        ax.grid(True, alpha=0.3)
+        
+        ax = axes[0, 1]
+        ax.plot(episodes_df['episode'], episodes_df['avg_value_loss'], linewidth=2, color='green')
+        ax.fill_between(episodes_df['episode'], episodes_df['avg_value_loss'], alpha=0.3, color='green')
+        ax.set_xlabel('Episode')
+        ax.set_ylabel('Value Loss')
+        ax.set_title('Value Loss Over Training')
+        ax.grid(True, alpha=0.3)
+        
+        ax = axes[1, 0]
+        ax.plot(episodes_df['episode'], episodes_df['avg_entropy'], linewidth=2, color='orange')
+        ax.fill_between(episodes_df['episode'], episodes_df['avg_entropy'], alpha=0.3, color='orange')
+        ax.set_xlabel('Episode')
+        ax.set_ylabel('Entropy')
+        ax.set_title('Entropy Over Training (Higher = More Exploration)')
+        ax.grid(True, alpha=0.3)
+        
+        ax = axes[1, 1]
+        ax.plot(episodes_df['episode'], episodes_df['avg_clip_frac'], linewidth=2, color='purple')
+        ax.fill_between(episodes_df['episode'], episodes_df['avg_clip_frac'], alpha=0.3, color='purple')
+        ax.set_xlabel('Episode')
+        ax.set_ylabel('Clipping Fraction')
+        ax.set_title('PPO Clipping Fraction (Diagnostic)')
         ax.grid(True, alpha=0.3)
         
         plt.tight_layout()
