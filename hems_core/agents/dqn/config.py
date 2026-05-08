@@ -17,7 +17,7 @@ N_BAT_ACTIONS = 7   # battery: discharge … charge
 N_EV_ACTIONS  = 7   # EV:      discharge … charge  (negative = V2H if supported)
 
 BAT_LEVELS = np.linspace(-1.0, 1.0, N_BAT_ACTIONS, dtype=np.float32)
-EV_LEVELS  = np.linspace(-1.0, 1.0, N_EV_ACTIONS,  dtype=np.float32)
+EV_LEVELS  = np.linspace(0, 1.0, N_EV_ACTIONS,  dtype=np.float32)
 
 # Joint action table: shape (N_BAT * N_EV, 2)
 # action_table[i] = [bat_power, ev_power]

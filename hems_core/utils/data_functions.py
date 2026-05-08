@@ -105,7 +105,7 @@ def _get_Pv_value( data , idx):
         logger.warning(f"No PV data found for index {idx}")
         return 0.0
     
-    return float(day_data['PV Power Generation (W)'])
+    return float(day_data['PV Power Generation (W)'])*0.001  # Convert to kW
 
 
 def pv_profile(idx : int ) -> float:
@@ -113,7 +113,7 @@ def pv_profile(idx : int ) -> float:
     try:
         pv_data = load_pv_data()
         # PV data is in Watts, average across all 15-min intervals in that hour
-        return _get_Pv_value(pv_data, idx)*0.001
+        return _get_Pv_value(pv_data, idx)
     except Exception as e:
         logger.error(f"Error loading PV profile for index {idx}: {e}")
         return 0.0
@@ -125,7 +125,7 @@ def _get_Price_value( data , datetime):
     if day_data.empty:
         logger.warning(f"No price data found for hour {datetime}")
         return 0.0
-    return float(day_data['Price (EUR/MWhe)'].iloc[0])
+    return float(day_data['Price (EUR/MWhe)'].iloc[0])/1000.0  # Convert to EUR/Kwh
 
 def price_profile(idx) -> float:
     """
@@ -143,7 +143,7 @@ def price_profile(idx) -> float:
         load_data = load_load_data()
         datetime = load_data.iloc[idx].name  # Get the timestamp for the given index
 
-        return _get_Price_value(price_data,datetime)/1000.0
+        return _get_Price_value(price_data,datetime)
     except Exception as e:
         logger.error(f"Error loading price profile for hour {idx}: {e}")
         return 0.0
@@ -224,14 +224,13 @@ def normalize_pv(pv_value: float, max_value: Optional[float] = None) -> float:
     Args:
         pv_value: PV power in Watts
         max_value: Maximum expected PV output. If None, uses 90th percentile.
-    
     Returns:
         Normalized PV value
     """
     try:
         if max_value is None:
             pv_data = load_pv_data()
-            max_value = pv_data['PV Power Generation (W)'].quantile(0.9)
+            max_value = pv_data['PV Power Generation (W)'].quantile(0.9)*0.001  # Convert to kW
         return min(float(pv_value) / max_value, 1.0)
     except Exception as e:
         logger.error(f"Error normalizing PV: {e}")

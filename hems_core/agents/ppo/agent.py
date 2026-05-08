@@ -164,6 +164,7 @@ class PPOAgent:
 
         action, log_prob = self.actor.get_action(s, deterministic=deterministic)
         value            = self.critic(s).item()
+        action[1] = (action[1] + 1) / 2  # Rescale EV action from [-1,1] to [0,1]
         return action, log_prob, value
 
     # ------------------------------------------------------------------

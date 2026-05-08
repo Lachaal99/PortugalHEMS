@@ -79,9 +79,10 @@ class SACAgent:
                 action, _ = self.actor.sample(state_tensor)
             else:
                 action, _ = self.actor.sample(state_tensor)
-                action = self.actor(state_tensor)[0]  # Use mean
-        
-        return action.cpu().numpy().squeeze(0)
+                action = self.actor(state_tensor)[0]
+        actions = action.cpu().numpy().squeeze(0)
+        actions[1]= (actions[1]+1) /2
+        return actions
 
     def store_transition(self, s, a, r, s_next, done):
         """Store transition in replay buffer."""

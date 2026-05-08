@@ -105,7 +105,7 @@ class TrainingLogger:
         print(f"  - {config_file}")
 
 
-def train_sac(num_episodes=100, batch_size=256, update_freq=1, model_save_freq=20):
+def train_sac(num_episodes=100, batch_size=256, update_freq=1, model_save_freq=500):
     """
     Train SAC agent on HEMS environment.
     
@@ -249,7 +249,7 @@ def train_sac(num_episodes=100, batch_size=256, update_freq=1, model_save_freq=2
     print("=" * 70)
 
 
-def train_dqn(num_episodes=500, update_freq=1, model_save_freq=50):
+def train_dqn(num_episodes=500, update_freq=1, model_save_freq=500):
     """
     Train DQN agent on HEMS environment.
     
@@ -382,7 +382,7 @@ def train_dqn(num_episodes=500, update_freq=1, model_save_freq=50):
     print("=" * 70)
 
 
-def train_ppo(num_episodes=200, model_save_freq=20):
+def train_ppo(num_episodes=200, model_save_freq=500):
     """
     Train PPO agent on HEMS environment.
     
@@ -549,22 +549,13 @@ def train_ppo(num_episodes=200, model_save_freq=20):
 
 
 if __name__ == "__main__":
-    # Train for 100 episodes
-    # Adjust hyperparameters as needed:
-    # - num_episodes: Number of training episodes
-    # - batch_size: Batch size for updates
-    # - update_freq: How often to update (every N steps)
-    # - model_save_freq: Save model every N episodes
-    
-    # Uncomment the agent you want to train:
-    
     # Train SAC agent
-    # train_sac(
-    #     num_episodes=800,
-    #     batch_size=256,
-    #     update_freq=1,
-    #     model_save_freq=500
-    # )
+    train_sac(
+         num_episodes=800,
+         batch_size=256,
+         update_freq=1,
+         model_save_freq=500
+     )
     
     # Train DQN agent
     # train_dqn(
@@ -572,7 +563,7 @@ if __name__ == "__main__":
     # )
     
     # Train PPO agent
-    train_ppo(
-        num_episodes=800,
-        model_save_freq=100,
-    )
+    #train_ppo(
+    #   num_episodes=800,
+    #    model_save_freq=100,
+    #)
